@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Dashboard</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css"/>
+<style>
+body{margin:0;font-family:sans-serif;background:#f4f6f9;}
+header{background:#0056b3;color:#fff;text-align:center;padding:1rem;font-size:1.2rem;}
+.container{display:flex;flex-direction:column;padding:20px;gap:20px;}
+table{width:100%;border-collapse:collapse;background:#fff;min-width:700px;box-shadow:0 2px 8px rgba(0,0,0,0.1);}
+th,td{padding:10px;border:1px solid #ddd;text-align:left;}
+th{background:#f0f2f5;}
+.status{padding:3px 6px;border-radius:4px;color:#fff;font-weight:bold;}
+.pending{background:#ff9800;}
+approved{background:#2196f3;}
+rejected{background:#f44336;}
+done{background:#4caf50;}
+button{margin-right:5px;padding:5px 8px;cursor:pointer;border:none;border-radius:3px;}
+button:hover{opacity:0.8;}
+#map{height:400px;}
+</style>
+</head>
+<body>
+<header>Admin Dashboard - Citizen Reports</header>
+<div class="container">
+<table>
+<thead>
+<tr>
+<th>ID</th><th>Category</th><th>Severity</th><th>Description</th><th>Time</th><th>Status</th><th>Actions</th>
+</tr>
+</thead>
+<tbody id="reportTable"></tbody>
+</table>
+<div id="map"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
+<script>
+const map = L.map('map').setView([23.8103,90.4125],12);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+const markers = L.markerClusterGroup();
+map.addLayer(markers);
+
+function getReports(){ return JSON.parse(localStorage.getItem("reports")||"[]"); }
+function saveReports(r){ localStorage.setItem("reports",JSON.stringify(r)); }
+
+// Add 15 sample reports if empty
+function addSampleData(){
+  let reports=getReports();
+  if(reports.length===0){
+    const categories=["Road","Water","Electricity","Waste","Other"];
+    const severities=["Low","Medium","High"];
+    for(let i=1;i<=15;i++){
+      reports.push({
+        id:1000+i,
+        category: categories[Math.floor(Math.random()*categories.length)],
+        severity: severities[Math.floor(Math.random()*severities.length)],
+        description:"Sample report "+i,
+        time:new Date(Date.now() - Math.floor(Math.random()*1000000000)),
+        status:"Pending",
+        lat:23.8103 + Math.random()*0.05,
+        lng:90.4125 + Math.random()*0.05,
+        images:[]
+      });
+    }
+    saveReports(reports);
+  }
+}
+
+function loadReports(){
+  const table=document.getElementById("reportTable");
+  table.innerHTML="";
+  markers.clearLayers();
+  getReports().forEach((r,i)=>{
+    const row=document.createElement("tr");
+    row.innerHTML=`<td>${r.id}</td>
+<td>${r.category}</td>
+<td>${r.severity}</td>
+<td>${r.description}</td>
+<td>${new Date(r.time).toLocaleString()}</td>
+<td><span class="status ${r.status.toLowerCase()}">${r.status}</span></td>
+<td>
+<button onclick="updateStatus(${i},'Approved')">Approve</button>
+<button onclick="updateStatus(${i},'Rejected')">Reject</button>
+<button onclick="updateStatus(${i},'Done')">Done</button>
+</td>`;
+    table.appendChild(row);
+
+    if(r.lat!=undefined && r.lng!=undefined){
+      const marker=L.marker([r.lat,r.lng]);
+      let popup=`<b>${r.category}</b> (${r.severity})<br>${r.description}<br>Status: ${r.status}`;
+      marker.bindPopup(popup);
+      markers.addLayer(marker);
+    }
+  });
+}
+
+function updateStatus(i,status){
+  const reports=getReports();
+  reports[i].status=status;
+  saveReports(reports);
+  loadReports();
+}
+
+addSampleData();
+loadReports();
+</script>
+</body>
+</html>

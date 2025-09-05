@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CityPulse Reporting Planning</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css"/>
+<style>
+html, body {height:100%; margin:0; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;}
+header{background:#0056b3; color:#fff; text-align:center; padding:1rem; box-shadow:0 2px 5px rgba(0,0,0,0.2);}
+.container{display:flex; height:calc(100% - 70px); overflow:hidden;}
+.form-section{width:350px; background:#fff; padding:1.5rem; overflow-y:auto; display:flex; flex-direction:column; gap:0.8rem; box-shadow:2px 0 10px rgba(0,0,0,0.1);}
+input, select, textarea, button{width:100%; padding:0.5rem; margin-bottom:0.5rem;}
+textarea{min-height:80px;}
+button{background:#0056b3;color:#fff;border:none;cursor:pointer;font-weight:600;}
+button:hover{background:#004094;}
+#map{flex:1; min-width:0;}
+.status{font-weight:bold; color:#0056b3; margin-top:0.5rem;}
+.popup-img{max-width:100px;}
+</style>
+</head>
+<body>
+
+<header><h1>CityPulse Reporting Planning</h1></header>
+<div class="container">
+  <div class="form-section">
+    <form id="reportForm">
+      <label>Category</label>
+      <select id="category" required>
+        <option value="">Select</option>
+        <option value="Road">Road</option>
+        <option value="Water">Water</option>
+        <option value="Electricity">Electricity</option>
+        <option value="Waste">Waste</option>
+        <option value="Other">Other</option>
+      </select>
+      <label>Severity</label>
+      <select id="severity" required>
+        <option value="">Select</option>
+        <option value="Low">Low</option>
+        <option value="Medium">Medium</option>
+        <option value="High">High</option>
+      </select>
+      <label>Description</label>
+      <textarea id="description" required></textarea>
+      <label>Images (optional)</label>
+      <input type="file" id="image" multiple accept="image/*">
+      <button type="submit">Submit Report</button>
+    </form>
+    <div id="statusMessage" class="status"></div>
+  </div>
+  <div id="map"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
+<script>
+const map = L.map('map').setView([23.8103, 90.4125], 12);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+const markers = L.markerClusterGroup();
+map.addLayer(markers);
+
+function getReports(){ return JSON.parse(localStorage.getItem("reports")||"[]"); }
+function saveReports(r){ localStorage.setItem("reports",JSON.stringify(r)); }
+
+function loadReports(){
+  markers.clearLayers();
+  getReports().forEach(r=>{
+    if(r.lat!=undefined && r.lng!=undefined){
+      const marker=L.marker([r.lat,r.lng]);
+      let popup=`<b>${r.category}</b> (${r.severity})<br>${r.description}<br>${new Date(r.time).toLocaleString()}<br>Status: ${r.status}`;
+      if(r.images) r.images.forEach(u=>popup+=`<br><img src="${u}" class="popup-img">`);
+      marker.bindPopup(popup);
+      markers.addLayer(marker);
+    }
+  });
+}
+
+document.getElementById("reportForm").addEventListener("submit",e=>{
+  e.preventDefault();
+  const status=document.getElementById("statusMessage");
+  status.textContent="Submitting... Please wait.";
+  const category=document.getElementById("category").value;
+  const severity=document.getElementById("severity").value;
+  const description=document.getElementById("description").value;
+  const files=document.getElementById("image").files;
+
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(pos=>{
+      let images=[];
+      for(let f of files) images.push(URL.createObjectURL(f));
+      const reports=getReports();
+      reports.push({
+        id:Date.now(),
+        category,severity,description,
+        lat:pos.coords.latitude,
+        lng:pos.coords.longitude,
+        time:new Date(),
+        status:"Pending",
+        images
+      });
+      saveReports(reports);
+      e.target.reset();
+      status.textContent="Report submitted successfully! Waiting for action...";
+      loadReports();
+    },err=>{status.textContent="Could not get location: "+err.message;});
+  }else{ status.textContent="Geolocation not supported"; }
+});
+
+loadReports();
+</script>
+</body>
+</html>
